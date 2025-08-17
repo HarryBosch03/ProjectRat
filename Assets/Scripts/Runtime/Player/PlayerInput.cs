@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -10,12 +11,27 @@ namespace Runtime.Player
         public float mouseSensitivity = 0.3f;
 
         private PlayerMotor motor;
-        private Camera mainCamera;
+        private UnityEngine.Camera mainCamera;
 
+        public bool isActiveViewer => activeViewer == this;
+        
+        public static PlayerInput activeViewer { get; private set; }
+        public static List<PlayerInput> players { get; } = new List<PlayerInput>();
+        
         private void Awake()
         {
             motor = GetComponent<PlayerMotor>();
-            mainCamera = Camera.main;
+            mainCamera = UnityEngine.Camera.main;
+        }
+
+        private void OnEnable()
+        {
+            players.Add(this);
+        }
+
+        private void OnDisable()
+        {
+            players.Remove(this);
         }
 
         public override void OnNetworkSpawn()
@@ -23,6 +39,7 @@ namespace Runtime.Player
             if (IsOwner)
             {
                 Cursor.lockState = CursorLockMode.Locked;
+                activeViewer = this;
             }
         }
 
@@ -43,8 +60,9 @@ namespace Runtime.Player
 
                 if (kb.spaceKey.wasPressedThisFrame) motor.Jump();
 
+                var cameraTanLength = Mathf.Tan(mainCamera.fieldOfView * 0.5f * Mathf.Deg2Rad);
                 var deltaLook = Vector2.zero;
-                deltaLook += m.delta.ReadValue() * mouseSensitivity;
+                deltaLook += m.delta.ReadValue() * mouseSensitivity * cameraTanLength;
                 motor.rotation += deltaLook;
                 motor.rotation.y = Mathf.Clamp(motor.rotation.y, -90f, 90f);
             }
@@ -52,12 +70,9 @@ namespace Runtime.Player
 
         private void LateUpdate()
         {
-            if (IsOwner)
+            if (isActiveViewer)
             {
-                mainCamera.transform.position = motor.transform.position + Vector3.up * 1.7f;
-
-                var rotation = motor.rotation;
-                mainCamera.transform.rotation = Quaternion.Euler(-rotation.y, rotation.x, 0f);
+                mainCamera.transform.SetPositionAndRotation(motor.head.position, motor.head.rotation);
             }
         }
     }

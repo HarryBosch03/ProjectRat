@@ -1,0 +1,145 @@
+using System;
+using System.Text;
+using Runtime.Player;
+using TMPro;
+using Unity.Netcode;
+using UnityEngine;
+
+namespace Runtime.Items
+{
+    public class HeldItem : NetworkBehaviour, IInteractable
+    {
+        public string displayName;
+        
+        public Rigidbody inWorldModel;
+        public GameObject firstPersonHeldModel;
+        public GameObject thirdPersonHeldModel;
+        
+        private UnityEngine.Camera mainCamera;
+        private PlayerInput playerInput;
+
+        private IHeldItemBehaviour[] heldBehaviours;
+
+        public PlayerInteractionManager holder { get; private set; }
+
+        private void Awake()
+        {
+            heldBehaviours = GetComponentsInChildren<IHeldItemBehaviour>(true);
+            foreach (var heldBehaviour in heldBehaviours) heldBehaviour.enabled = false;
+            firstPersonHeldModel.gameObject.SetActive(false);
+
+            mainCamera = UnityEngine.Camera.main;
+        }
+
+        public override void OnNetworkSpawn()
+        {
+            if (!IsServer)
+            {
+                RequestHolderRpc();
+            }
+        }
+
+        [Rpc(SendTo.Owner)]
+        private void RequestHolderRpc(RpcParams rpcParams = default)
+        {
+            var sendParams = new RpcParams();
+            sendParams.Send.Target = RpcTarget.Single(rpcParams.Receive.SenderClientId, RpcTargetUse.Temp);
+            SetHolderRpc(holder, sendParams);
+        }
+
+        public void Interact(PlayerInteractionManager player)
+        {
+            if (holder != null) return;
+            SetHolderRpc(player);
+        }
+
+        public void Drop(PlayerInteractionManager player, Vector3 position, Vector3 velocity)
+        {
+            if (player != holder) return;
+            SetHolderRpc(null);
+            DropRpc(position, velocity);
+        }
+
+        [Rpc(SendTo.Everyone)]
+        private void DropRpc(Vector3 position, Vector3 velocity)
+        {
+            inWorldModel.transform.position = position;
+            inWorldModel.linearVelocity = velocity;
+            Physics.SyncTransforms();
+        }
+
+        private void Update()
+        {
+            if (holder != null)
+            {
+                var isFirstPerson = playerInput.isActiveViewer;
+
+                firstPersonHeldModel.SetActive(isFirstPerson);
+                thirdPersonHeldModel.SetActive(!isFirstPerson);
+            }
+        }
+
+        [Rpc(SendTo.Everyone, AllowTargetOverride = true)]
+        private void SetHolderRpc(NetworkBehaviourReference playerRef, RpcParams rpcParams = default)
+        {
+            playerRef.TryGet(out PlayerInteractionManager player);
+            
+            var previousHolder = holder;
+            holder = player;
+            if (player != null)
+            {
+                inWorldModel.gameObject.SetActive(false);
+
+                foreach (var heldBehaviour in heldBehaviours) heldBehaviour.enabled = true;
+
+                transform.SetParent(player.motor.head);
+                transform.SetLocalPositionAndRotation(Vector3.zero, Quaternion.identity);
+
+                inWorldModel.transform.SetLocalPositionAndRotation(Vector3.zero, Quaternion.identity);
+                inWorldModel.linearVelocity = Vector3.zero;
+                inWorldModel.angularVelocity = Vector3.zero;
+                
+                if (player.IsOwner) player.SetHoldingRpc(this);
+
+                if (IsServer)
+                {
+                    NetworkObject.ChangeOwnership(player.OwnerClientId);
+                }
+
+                playerInput = player.GetComponent<PlayerInput>();
+            }
+            else
+            {
+                inWorldModel.gameObject.SetActive(true);
+                firstPersonHeldModel.SetActive(false);
+                thirdPersonHeldModel.SetActive(false);
+
+                foreach (var heldBehaviour in heldBehaviours) heldBehaviour.enabled = false;
+
+                transform.SetParent(null);
+                
+                if (previousHolder != null && previousHolder.IsOwner) previousHolder.SetHoldingRpc(null);
+                
+                if (IsServer)
+                {
+                    NetworkObject.RemoveOwnership();
+                }
+
+                playerInput = null;
+            }
+        }
+
+#if UNITY_EDITOR
+        private void OnValidate()
+        {
+            if (!Application.isPlaying)
+            {
+                foreach (var heldBehaviour in GetComponentsInChildren<IHeldItemBehaviour>(true))
+                {
+                    heldBehaviour.enabled = false;
+                }
+            }
+        }
+#endif
+    }
+}

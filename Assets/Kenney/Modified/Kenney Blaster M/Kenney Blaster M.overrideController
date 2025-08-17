@@ -1,0 +1,27 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!221 &22100000
+AnimatorOverrideController:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: Kenney Blaster M
+  m_Controller: {fileID: 9100000, guid: 205b93e1d6a4e0e41ad802675df452d6, type: 2}
+  m_Clips:
+  - m_OriginalClip: {fileID: 7400000, guid: 581d5290de7dfdd4e8f3f34a884d3701, type: 2}
+    m_OverrideClip: {fileID: -5905265143110703864, guid: 955441cec42ebe543a56175f2760ab90, type: 3}
+  - m_OriginalClip: {fileID: 7400000, guid: 7485355e729def4488362da30a853fa0, type: 2}
+    m_OverrideClip: {fileID: 9018545720880794372, guid: 955441cec42ebe543a56175f2760ab90, type: 3}
+  - m_OriginalClip: {fileID: 7400000, guid: 1fb5e19ac3fe8ee4485f7a8e590aaafa, type: 2}
+    m_OverrideClip: {fileID: 8704096011536922265, guid: 955441cec42ebe543a56175f2760ab90, type: 3}
+  - m_OriginalClip: {fileID: 7400000, guid: cc153133eadc6a3459f78d139cdf53a4, type: 2}
+    m_OverrideClip: {fileID: 1948568898788717594, guid: 955441cec42ebe543a56175f2760ab90, type: 3}
+  - m_OriginalClip: {fileID: 7400000, guid: 431397e15436ad04ab5fb45ac069d643, type: 2}
+    m_OverrideClip: {fileID: 8107631069716493851, guid: 955441cec42ebe543a56175f2760ab90, type: 3}
+  - m_OriginalClip: {fileID: 7400000, guid: 954f12d02b241ce448ac02ba9c72e708, type: 2}
+    m_OverrideClip: {fileID: -7289307096678365549, guid: 955441cec42ebe543a56175f2760ab90, type: 3}
+  - m_OriginalClip: {fileID: 7400000, guid: e735208a6c1841d43980552340768b64, type: 2}
+    m_OverrideClip: {fileID: 1566588455613625143, guid: 955441cec42ebe543a56175f2760ab90, type: 3}
+  - m_OriginalClip: {fileID: 7400000, guid: 5efffc34c4e871843a2c754d071238ed, type: 2}
+    m_OverrideClip: {fileID: 5989788772874889114, guid: 955441cec42ebe543a56175f2760ab90, type: 3}
