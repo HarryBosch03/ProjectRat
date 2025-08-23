@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using Runtime.Utility;
 using Unity.Netcode;
+using Unity.VisualScripting;
 using UnityEngine;
 
 namespace Runtime.Player
@@ -11,6 +12,7 @@ namespace Runtime.Player
         public float moveSpeed = 8f;
         public float acceleration = 0.15f;
         public float radius = 0.3f;
+        public float airMovement;
 
         [Space] public float jumpHeight = 1f;
         public int jumpLeniencyFrames = 8;
@@ -190,6 +192,13 @@ namespace Runtime.Player
 
                 this.deltaVelocity += deltaVelocity;
             }
+            else
+            {
+                var force = Vector3.ClampMagnitude(moveDirection, 1f) * airMovement;
+                force.y = 0f;
+
+                deltaVelocity += force * Time.deltaTime;
+            }
         }
 
         private void CollisionCheck()
@@ -202,8 +211,18 @@ namespace Runtime.Player
 
             if (jumpFrames <= 0)
             {
-                if (Physics.SphereCast(new Ray(position + Vector3.up * castDistance, Vector3.down), radius, out var hit, castDistance - radius + castExtension + 0.05f, mask))
+                var hits = Physics.SphereCastAll(new Ray(position + Vector3.up * castDistance, Vector3.down), radius, castDistance - radius + castExtension + 0.05f, mask);
+                for (var i = 0; i < hits.Length; i++)
                 {
+                    var hit = hits[i];
+                    hit.normal.Normalize();
+
+                    if (hit.distance <= float.Epsilon) continue;
+                    if (hit.collider.transform.IsChildOf(transform)) continue;
+                    if (Mathf.Acos(hit.normal.y) * Mathf.Rad2Deg > 30f) continue;
+
+                    Debug.DrawRay(hit.point, hit.normal, Color.red);
+                    
                     position += Vector3.Project(hit.point - position, Vector3.up);
                     SyncPosition();
 

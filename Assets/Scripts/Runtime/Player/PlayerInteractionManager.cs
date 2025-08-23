@@ -16,7 +16,7 @@ namespace Runtime.Player
         public Vector3 dropVelocity;
 
         private IInteractable lookingAt;
-        
+
         public PlayerMotor motor { get; private set; }
         public HeldItem holding { get; private set; }
 
@@ -31,19 +31,20 @@ namespace Runtime.Player
             {
                 var kb = Keyboard.current;
                 var m = Mouse.current;
-                
+
                 if (kb.fKey.wasPressedThisFrame)
+                {
+                    if (lookingAt != null)
+                    {
+                        lookingAt.Interact(this);
+                    }
+                }
+
+                if (kb.qKey.wasPressedThisFrame)
                 {
                     if (holding != null)
                     {
-                        holding.Drop(this, motor.head.TransformPoint(dropPosition), motor.velocity + motor.head.TransformVector(dropVelocity));
-                    }
-                    else
-                    {
-                        if (lookingAt != null)
-                        {
-                            lookingAt.Interact(this);
-                        }
+                        DropItem();
                     }
                 }
 
@@ -52,11 +53,19 @@ namespace Runtime.Player
                     var scroll = m.scroll.y.ReadValue();
                     if (scroll > 0f)
                         lookingAt.Nudge(this, 1);
-                    
+
                     if (scroll < 0f)
                         lookingAt.Nudge(this, -1);
                 }
             }
+        }
+
+        public void DropItem()
+        {
+            if (!IsOwner) return;
+            
+            holding.Drop(this, motor.head.TransformPoint(dropPosition),
+                motor.velocity + motor.head.TransformVector(dropVelocity), true);
         }
 
         private void FixedUpdate()
@@ -68,7 +77,7 @@ namespace Runtime.Player
         {
             var ray = new Ray(motor.head.position, motor.head.forward);
             Debug.DrawRay(ray.origin, ray.direction);
-            
+
             if (Physics.Raycast(ray, out var hit, interactionRange))
             {
                 return hit.collider.GetComponentInParent<IInteractable>();

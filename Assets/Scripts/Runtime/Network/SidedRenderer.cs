@@ -12,9 +12,9 @@ namespace Runtime.Network
         [Space]
         public bool includeChildren;
 
-        private MeshRenderer[] renderer;
+        private MeshRenderer[] renderers;
 
-        private void Awake() { renderer = includeChildren ? GetComponentsInChildren<MeshRenderer>() : new[] { GetComponent<MeshRenderer>() }; }
+        private void Awake() { renderers = includeChildren ? GetComponentsInChildren<MeshRenderer>() : new[] { GetComponent<MeshRenderer>() }; }
 
         public override void OnNetworkSpawn() => UpdateRenderers();
 
@@ -24,9 +24,9 @@ namespace Runtime.Network
         {
             var visible = IsOwner ? visibleToOwner : visibleToObservers;
 
-            for (var i = 0; i < renderer.Length; i++)
+            for (var i = 0; i < renderers.Length; i++)
             {
-                renderer[i].shadowCastingMode = visible ? ShadowCastingMode.On : ShadowCastingMode.ShadowsOnly;
+                renderers[i].shadowCastingMode = visible ? ShadowCastingMode.On : ShadowCastingMode.ShadowsOnly;
             }
         }
     }

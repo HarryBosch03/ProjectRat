@@ -9,8 +9,10 @@ namespace Runtime.Interactables
         public int minValue;
         public int maxValue;
 
+        [field: SerializeField]
+        public string InteractionText { get; set; }
         public float normalizedValue => Mathf.InverseLerp(minValue, maxValue, currentValue);
-        
+
         public void Interact(PlayerInteractionManager player)
         {
             

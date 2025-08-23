@@ -1,4 +1,3 @@
-using System;
 using UnityEngine;
 using UnityEngine.Splines;
 
@@ -9,8 +8,15 @@ namespace Runtime.Train
     {
         public SplineContainer currentSpline;
         public Vector3 velocity;
-        public Transform wheelAnchor0;
-        public Transform wheelAnchor1;
+        
+        [Space]
+        public Transform bogieFront;
+        public Transform bogieBack;
+        public Transform attachFront;
+        public Transform attachBack;
+
+        [Space] public TrainMotor connectionFront;
+        [Space] public TrainMotor connectionBack;
 
         private Rigidbody body;
         
@@ -19,6 +25,16 @@ namespace Runtime.Train
         private void Awake()
         {
             body = GetComponent<Rigidbody>();
+
+            if (connectionFront == null)
+            {
+                var current = this;
+                while (current != null)
+                {
+                    current.AlignToTracks();
+                    current = current.connectionBack;
+                }
+            }
         }
 
         private void FixedUpdate()
@@ -48,13 +64,13 @@ namespace Runtime.Train
 
         private void AlignToTracks()
         {
-            SplineUtility.GetNearestPoint(currentSpline.Spline, wheelAnchor0.position, out var nearest0, out var t0);
-            transform.position += (Vector3)nearest0 - wheelAnchor0.position;
+            SplineUtility.GetNearestPoint(currentSpline.Spline, bogieFront.position, out var nearest0, out var t0);
+            transform.position += (Vector3)nearest0 - bogieFront.position;
         
-            SplineUtility.GetNearestPoint(currentSpline.Spline, wheelAnchor1.position, out var nearest1, out var t1);
+            SplineUtility.GetNearestPoint(currentSpline.Spline, bogieBack.position, out var nearest1, out var t1);
             var direction = nearest0 - nearest1;
             transform.rotation = Quaternion.LookRotation(direction, Vector3.up);
-            transform.position += (Vector3)nearest0 - wheelAnchor0.position;
+            transform.position += (Vector3)nearest0 - bogieFront.position;
 
             velocity -= Vector3.ProjectOnPlane(velocity, transform.forward);
         }

@@ -21,8 +21,15 @@ namespace Runtime.Items
 
         private IHeldItemBehaviour[] heldBehaviours;
 
+        public string InteractionText => $"Pickup {displayName}";
         public PlayerInteractionManager holder { get; private set; }
 
+        public bool EnablePhysics
+        {
+            get => !inWorldModel.isKinematic;
+            set => inWorldModel.isKinematic = !value;
+        }
+        
         private void Awake()
         {
             heldBehaviours = GetComponentsInChildren<IHeldItemBehaviour>(true);
@@ -47,7 +54,7 @@ namespace Runtime.Items
             sendParams.Send.Target = RpcTarget.Single(rpcParams.Receive.SenderClientId, RpcTargetUse.Temp);
             SetHolderRpc(holder, sendParams);
         }
-
+        
         public void Interact(PlayerInteractionManager player)
         {
             if (holder != null) return;
@@ -56,18 +63,19 @@ namespace Runtime.Items
 
         public void Nudge(PlayerInteractionManager player, int direction) { }
 
-        public void Drop(PlayerInteractionManager player, Vector3 position, Vector3 velocity)
+        public void Drop(PlayerInteractionManager player, Vector3 position, Vector3 velocity, bool enablePhysics)
         {
             if (player != holder) return;
             SetHolderRpc(null);
-            DropRpc(position, velocity);
+            DropRpc(position, velocity, enablePhysics);
         }
 
         [Rpc(SendTo.Everyone)]
-        private void DropRpc(Vector3 position, Vector3 velocity)
+        private void DropRpc(Vector3 position, Vector3 velocity, bool enablePhysics)
         {
             inWorldModel.transform.position = position;
             inWorldModel.linearVelocity = velocity;
+            EnablePhysics = enablePhysics;
             Physics.SyncTransforms();
         }
 
