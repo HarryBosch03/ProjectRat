@@ -1,5 +1,6 @@
 using System;
 using System.Text;
+using Runtime.Interactables;
 using Runtime.Player;
 using TMPro;
 using Unity.Netcode;
@@ -10,11 +11,11 @@ namespace Runtime.Items
     public class HeldItem : NetworkBehaviour, IInteractable
     {
         public string displayName;
-        
+
         public Rigidbody inWorldModel;
         public GameObject firstPersonHeldModel;
         public GameObject thirdPersonHeldModel;
-        
+
         private UnityEngine.Camera mainCamera;
         private PlayerInput playerInput;
 
@@ -53,6 +54,8 @@ namespace Runtime.Items
             SetHolderRpc(player);
         }
 
+        public void Nudge(PlayerInteractionManager player, int direction) { }
+
         public void Drop(PlayerInteractionManager player, Vector3 position, Vector3 velocity)
         {
             if (player != holder) return;
@@ -83,7 +86,7 @@ namespace Runtime.Items
         private void SetHolderRpc(NetworkBehaviourReference playerRef, RpcParams rpcParams = default)
         {
             playerRef.TryGet(out PlayerInteractionManager player);
-            
+
             var previousHolder = holder;
             holder = player;
             if (player != null)
@@ -98,7 +101,7 @@ namespace Runtime.Items
                 inWorldModel.transform.SetLocalPositionAndRotation(Vector3.zero, Quaternion.identity);
                 inWorldModel.linearVelocity = Vector3.zero;
                 inWorldModel.angularVelocity = Vector3.zero;
-                
+
                 if (player.IsOwner) player.SetHoldingRpc(this);
 
                 if (IsServer)
@@ -117,9 +120,9 @@ namespace Runtime.Items
                 foreach (var heldBehaviour in heldBehaviours) heldBehaviour.enabled = false;
 
                 transform.SetParent(null);
-                
+
                 if (previousHolder != null && previousHolder.IsOwner) previousHolder.SetHoldingRpc(null);
-                
+
                 if (IsServer)
                 {
                     NetworkObject.RemoveOwnership();

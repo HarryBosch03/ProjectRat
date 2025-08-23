@@ -88,15 +88,11 @@ namespace Runtime.Items
                             var head = holder.motor.head;
                             ShootRpc(head.position, head.forward);
                         }
-                        // else
-                        // {
-                        //     Reload();
-                        // }
                     }
 
                     aimPercent = Mathf.MoveTowards(aimPercent, m.rightButton.isPressed ? 1 : 0, Time.deltaTime / adsDuration);
 
-                    if (!isReloading && kb.rKey.isPressed)
+                    if (!isReloading && kb.rKey.isPressed && currentMagazine < magazineSize)
                     {
                         ReloadRpc();
                     }

@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using Runtime.Utility;
 using Unity.Netcode;
@@ -29,7 +30,6 @@ namespace Runtime.Player
         private int jumpInput;
 
         private Rigidbody ground;
-        private Vector3 positionOnGround;
         private float lastGroundRotation;
         private float ladderPos;
         
@@ -38,7 +38,7 @@ namespace Runtime.Player
         private readonly List<Collider> currentTriggersBuffer = new List<Collider>(64);
 
         [HideInInspector] public Vector3 position;
-        [HideInInspector] public Vector3 localVelocity;
+        [HideInInspector] public Vector3 velocity;
         [HideInInspector] public Vector3 moveDirection;
         [HideInInspector] public Vector2 rotation;
 
@@ -46,8 +46,6 @@ namespace Runtime.Player
         public Transform headBone { get; set; }
         public Vector3 headBoneRotationCorrection { get; set; }
         
-        public Vector3 totalVelocity => localVelocity + (ground != null ? ground.GetPointVelocity(position) : Vector3.zero);
-
         private Vector3 lastPosition;
 
         public void Jump() => jumpInput = jumpLeniencyFrames;
@@ -57,9 +55,7 @@ namespace Runtime.Player
         private void FixedUpdate()
         {
             lastPosition = position;
-            if (ground != null) 
-                position = ground.transform.TransformPoint(positionOnGround);
-            transform.position = position;
+            SyncPosition();
             
             if (IsOwner)
             {
@@ -82,11 +78,25 @@ namespace Runtime.Player
                 CollisionCheck();
             }
 
-            if (ground != null) 
-                positionOnGround = ground.transform.InverseTransformPoint(position);
-           
+            if (ground != null)
+            {
+                StartCoroutine(MatchGroundMovement());
+            }
+
             if (IsOwner) 
-                SendNetStateRpc(position, localVelocity, rotation);
+                SendNetStateRpc(position, velocity, rotation);
+        }
+
+        private IEnumerator MatchGroundMovement()
+        {
+            Physics.SyncTransforms();
+            var localPos = ground.transform.InverseTransformPoint(position);
+            
+            yield return new WaitForFixedUpdate();
+            
+            Physics.SyncTransforms();
+            position = ground.transform.TransformPoint(localPos);
+            SyncPosition();
         }
 
         private void DoLadderStuff()
@@ -103,17 +113,18 @@ namespace Runtime.Player
             {
                 var jumpForce = Mathf.Sqrt(2f * jumpHeight * -Physics.gravity.y);
                 var jumpVector = (ladder.transform.forward + Vector3.up).normalized;
-                localVelocity = jumpVector * jumpForce;
+                velocity = jumpVector * jumpForce;
                 jumpFrames = 3;
                 
                 ladder = null;
+                return;
             }
 
             var positionOnLadder = ladder.GetPosition(ladderPos);
             positionOnLadder += ladder.transform.forward * Mathf.Clamp(ladder.Length - ladderPos, 0f, 1f) * 0.5f;
             
             position = Vector3.Lerp(position, positionOnLadder, Time.deltaTime / ladderSmoothing);
-            localVelocity = Vector3.zero;
+            velocity = Vector3.zero;
         }
 
         [Rpc(SendTo.Everyone, Delivery = RpcDelivery.Unreliable)]
@@ -122,17 +133,17 @@ namespace Runtime.Player
             if (IsOwner) return;
 
             this.position = position;
-            this.localVelocity = velocity;
+            this.velocity = velocity;
             this.rotation = rotation;
         }
 
         private void Update()
         {
-            transform.position = Vector3.LerpUnclamped(lastPosition, position, (Time.time - Time.fixedTime) / Time.fixedDeltaTime);
-
+            SyncPosition();
+            
             if (ground != null)
             {
-                var groundRotation = Vector3.SignedAngle(Vector3.forward, ground.transform.forward, Vector3.up);
+                var groundRotation = Vector3.SignedAngle(Vector3.forward, Vector3.ProjectOnPlane(ground.transform.forward, Vector3.up).normalized, Vector3.up);
                 var deltaAngle = Mathf.DeltaAngle(groundRotation, lastGroundRotation);
                 rotation.x -= deltaAngle;
 
@@ -161,7 +172,7 @@ namespace Runtime.Player
             if (jumpInput > 0 && onGround)
             {
                 var jumpForce = Mathf.Sqrt(2f * jumpHeight * -Physics.gravity.y);
-                localVelocity.y = jumpForce;
+                velocity.y = jumpForce;
                 jumpFrames = 3;
             }
         }
@@ -173,8 +184,8 @@ namespace Runtime.Player
                 var target = Vector3.ClampMagnitude(moveDirection, 1f) * moveSpeed;
 
                 var deltaVelocity =
-                    Vector3.MoveTowards(localVelocity, target, Time.deltaTime * moveSpeed / acceleration) -
-                    localVelocity;
+                    Vector3.MoveTowards(velocity, target, Time.deltaTime * moveSpeed / acceleration) -
+                    velocity;
                 deltaVelocity.y = 0f;
 
                 this.deltaVelocity += deltaVelocity;
@@ -194,17 +205,11 @@ namespace Runtime.Player
                 if (Physics.SphereCast(new Ray(position + Vector3.up * castDistance, Vector3.down), radius, out var hit, castDistance - radius + castExtension + 0.05f, mask))
                 {
                     position += Vector3.Project(hit.point - position, Vector3.up);
-                    transform.position = position;
+                    SyncPosition();
 
-                    localVelocity.y = Mathf.Max(0f, localVelocity.y);
+                    velocity.y = Mathf.Max(0f, velocity.y);
 
-                    onGround = true;
-                    if (ground != hit.rigidbody && hit.rigidbody != null)
-                    {
-                        lastGroundRotation = Vector3.SignedAngle(Vector3.forward, hit.rigidbody.transform.forward, Vector3.up);
-                    }
-
-                    ground = hit.rigidbody;
+                    SetGround(true, hit.rigidbody);
                 }
             }
 
@@ -243,9 +248,9 @@ namespace Runtime.Player
                             other, other.transform.position, other.transform.rotation, out var normal, out var depth))
                     {
                         position += normal * depth;
-                        transform.position = position;
+                        SyncPosition();
 
-                        localVelocity += normal * Mathf.Max(0f, Vector3.Dot(normal, -localVelocity));
+                        velocity += normal * Mathf.Max(0f, Vector3.Dot(normal, -velocity));
                     }
                 }
             }
@@ -256,12 +261,26 @@ namespace Runtime.Player
             }
         }
 
+        private void SetGround(bool onGround, Rigidbody ground)
+        {
+            this.onGround = onGround;
+            if (this.ground != ground)
+            {
+                if (ground != null)
+                {
+                    lastGroundRotation = Vector3.SignedAngle(Vector3.forward, Vector3.ProjectOnPlane(ground.transform.forward, Vector3.up), Vector3.up);
+                }
+            }
+            this.ground = ground;
+        }
+        
         private void TriggerEntered(Collider trigger)
         {
             if (trigger.gameObject.CompareTag("Ladder") && trigger.TryGetComponent(out Ladder ladder))
             {
                 this.ladder = ladder;
                 ladderPos = Mathf.Clamp(ladder.GetPosition(position), 0.1f, ladder.Length - 0.1f);
+                SetGround(true, this.ladder.ReferenceBody);
             }
         }
         
@@ -272,11 +291,23 @@ namespace Runtime.Player
 
         private void Integrate()
         {
-            position += localVelocity * Time.fixedDeltaTime;
-            localVelocity += deltaVelocity;
+            position += velocity * Time.fixedDeltaTime;
+            velocity += deltaVelocity;
             deltaVelocity = ladder == null ? Physics.gravity * Time.fixedDeltaTime : Vector3.zero;
 
-            transform.position = position;
+            SyncPosition();
+        }
+
+        private void SyncPosition()
+        {
+            if (Time.inFixedTimeStep)
+            {
+                transform.position = position;
+            }
+            else
+            {
+                transform.position = Vector3.Lerp(lastPosition, position, (Time.time - Time.fixedTime) / Time.fixedDeltaTime);
+            }
         }
     }
 }

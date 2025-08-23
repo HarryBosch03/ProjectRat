@@ -1,4 +1,5 @@
 using System;
+using Runtime.Interactables;
 using Runtime.Items;
 using Unity.Netcode;
 using UnityEngine;
@@ -6,6 +7,7 @@ using UnityEngine.InputSystem;
 
 namespace Runtime.Player
 {
+    [DefaultExecutionOrder(10)]
     [RequireComponent(typeof(PlayerMotor))]
     public class PlayerInteractionManager : NetworkBehaviour
     {
@@ -25,16 +27,16 @@ namespace Runtime.Player
 
         private void Update()
         {
-            lookingAt = GetLookingAt();
-
             if (IsOwner)
             {
                 var kb = Keyboard.current;
+                var m = Mouse.current;
+                
                 if (kb.fKey.wasPressedThisFrame)
                 {
                     if (holding != null)
                     {
-                        holding.Drop(this, motor.head.TransformPoint(dropPosition), motor.totalVelocity + motor.head.TransformVector(dropVelocity));
+                        holding.Drop(this, motor.head.TransformPoint(dropPosition), motor.velocity + motor.head.TransformVector(dropVelocity));
                     }
                     else
                     {
@@ -44,12 +46,29 @@ namespace Runtime.Player
                         }
                     }
                 }
+
+                if (lookingAt != null)
+                {
+                    var scroll = m.scroll.y.ReadValue();
+                    if (scroll > 0f)
+                        lookingAt.Nudge(this, 1);
+                    
+                    if (scroll < 0f)
+                        lookingAt.Nudge(this, -1);
+                }
             }
+        }
+
+        private void FixedUpdate()
+        {
+            lookingAt = GetLookingAt();
         }
 
         private IInteractable GetLookingAt()
         {
             var ray = new Ray(motor.head.position, motor.head.forward);
+            Debug.DrawRay(ray.origin, ray.direction);
+            
             if (Physics.Raycast(ray, out var hit, interactionRange))
             {
                 return hit.collider.GetComponentInParent<IInteractable>();

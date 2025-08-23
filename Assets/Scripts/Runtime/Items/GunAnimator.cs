@@ -28,7 +28,7 @@ namespace Runtime.Items
             if (holder != null)
             {
                 var motor = holder.motor;
-                var movement = motor.onGround ? new Vector2(motor.localVelocity.x, motor.localVelocity.z).magnitude / motor.moveSpeed : 0f;
+                var movement = motor.onGround ? new Vector2(motor.velocity.x, motor.velocity.z).magnitude / motor.moveSpeed : 0f;
                 smoothedMovement = Mathf.Lerp(smoothedMovement, movement, Time.deltaTime / 0.1f);
                 animator.SetFloat(MovementAnimParameter, smoothedMovement);
             }

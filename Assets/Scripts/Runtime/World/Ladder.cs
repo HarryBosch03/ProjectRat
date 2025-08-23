@@ -5,6 +5,13 @@ public class Ladder : MonoBehaviour
 {
     public float Length;
     public float Offset;
+    
+    public Rigidbody ReferenceBody { get; private set; }
+
+    private void Awake()
+    {
+        ReferenceBody = GetComponentInParent<Rigidbody>();
+    }
 
     private void OnDrawGizmosSelected()
     {
