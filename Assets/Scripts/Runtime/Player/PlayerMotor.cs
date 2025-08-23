@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Runtime.Utility;
 using Unity.Netcode;
 using Unity.VisualScripting;
+using UnityEditor;
 using UnityEngine;
 
 namespace Runtime.Player
@@ -203,33 +204,14 @@ namespace Runtime.Player
 
         private void CollisionCheck()
         {
-            var castDistance = stepHeight + radius;
             var mask = PhysicsMatrix.GetCollisionMaskForLayer(gameObject.layer);
-            var castExtension = onGround ? stepHeight : 0f; 
-
+            var wasOnGround = onGround;
             onGround = false;
 
+            SyncPosition();
             if (jumpFrames <= 0)
             {
-                var hits = Physics.SphereCastAll(new Ray(position + Vector3.up * castDistance, Vector3.down), radius, castDistance - radius + castExtension + 0.05f, mask);
-                for (var i = 0; i < hits.Length; i++)
-                {
-                    var hit = hits[i];
-                    hit.normal.Normalize();
-
-                    if (hit.distance <= float.Epsilon) continue;
-                    if (hit.collider.transform.IsChildOf(transform)) continue;
-                    if (Mathf.Acos(hit.normal.y) * Mathf.Rad2Deg > 30f) continue;
-
-                    Debug.DrawRay(hit.point, hit.normal, Color.red);
-                    
-                    position += Vector3.Project(hit.point - position, Vector3.up);
-                    SyncPosition();
-
-                    velocity.y = Mathf.Max(0f, velocity.y);
-
-                    SetGround(true, hit.rigidbody);
-                }
+                CheckForGround(mask, wasOnGround);
             }
 
             currentTriggersBuffer.Clear();
@@ -278,6 +260,65 @@ namespace Runtime.Player
             {
                 if (!currentTriggers.Contains(trigger)) TriggerExited(trigger);
             }
+        }
+
+        private void CheckForGround(int mask, bool wasOnGround)
+        {
+            var bestHit = (RaycastHit?)null;
+            var bestHitDistance = float.MaxValue;
+
+            if (CheckForGround(Vector3.zero, mask, out var hit, wasOnGround))
+            {
+                bestHit = hit;
+                bestHitDistance = hit.distance;
+            }
+            
+            for (var i = 0; i < 8; i++)
+            {
+                var angle = i / 8f * Mathf.PI * 2f;
+                var offset = new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * radius;
+                if (CheckForGround(offset, mask, out hit, wasOnGround))
+                {
+                    if (hit.distance < bestHitDistance)
+                    {
+                        bestHit = hit;
+                        bestHitDistance = hit.distance;
+                    }
+                }
+            }
+
+            if (bestHit.HasValue)
+            {
+                hit = bestHit.Value;
+                position += Vector3.Project(hit.point - position, Vector3.up);
+                SyncPosition();
+
+                velocity.y = Mathf.Max(0f, velocity.y);
+
+                SetGround(true, hit.rigidbody);   
+            }
+        }
+        
+        private bool CheckForGround(Vector3 offset, int mask, out RaycastHit result, bool wasOnGround)
+        {
+            result = default;
+            
+            var castDistance = stepHeight + 0.1f;
+            var castExtension = wasOnGround ? stepHeight : 0f;
+            var ray = new Ray(position + Vector3.up * castDistance + offset, Vector3.down);
+
+            if (Physics.Raycast(ray, out var hit, castDistance + castExtension + 0.1f, mask))
+            {
+                hit.normal.Normalize();
+
+                if (hit.collider.transform.IsChildOf(transform)) return false;
+                if (Mathf.Acos(hit.normal.y) * Mathf.Rad2Deg > 30f) return false;
+
+                result = hit;
+                return true;
+            }
+
+            return false;
         }
 
         private void SetGround(bool onGround, Rigidbody ground)
