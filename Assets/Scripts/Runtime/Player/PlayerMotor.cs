@@ -48,6 +48,7 @@ namespace Runtime.Player
         public bool onGround { get; private set; }
         public Transform headBone { get; set; }
         public Vector3 headBoneRotationCorrection { get; set; }
+        public Vector3 totalVelocity => velocity + (ground != null ? ground.GetPointVelocity(position) : Vector3.zero);
         
         private Vector3 lastPosition;
 

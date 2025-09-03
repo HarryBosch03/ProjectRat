@@ -6,13 +6,13 @@ namespace Runtime.Train
     [RequireComponent(typeof(TMP_Text))]
     public class TrainDebugText : MonoBehaviour
     {
-        private TrainMotor motor;
+        private Carriage motor;
         private TrainControls controls;
         private TMP_Text text;
 
         private void Awake()
         {
-            motor = GetComponentInParent<TrainMotor>();
+            motor = GetComponentInParent<Carriage>();
             controls = GetComponentInParent<TrainControls>();
             text = GetComponent<TMP_Text>();
         }

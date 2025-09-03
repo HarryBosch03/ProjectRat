@@ -1,3 +1,4 @@
+using Runtime.Rendering.DecalParticleSystem;
 using UnityEngine;
 
 namespace Runtime.Items
@@ -6,6 +7,7 @@ namespace Runtime.Items
     {
         public ParticleSystem muzzleFlash;
         public ParticleSystem hitEffect;
+        public DecalParticleSystem hitEffectDecal;
 
         private void Awake()
         {
@@ -47,6 +49,10 @@ namespace Runtime.Items
                 hitEffect.transform.rotation = Quaternion.LookRotation(hit.normal);
 
                 hitEffect.Play(true);
+
+                if (hitEffectDecal != null) hitEffectDecal.Spawn(hit.collider.transform, hit.point, hit.normal);
+                
+                Debug.Log(hit.transform.name);
             }
         }
     }

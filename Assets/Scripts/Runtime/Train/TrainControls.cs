@@ -10,13 +10,13 @@ namespace Runtime.Train
         public float maxSpeedKmpH;
         public float acceleration;
 
-        private TrainMotor motor;
+        private Carriage motor;
 
         public float targetSpeed => throttle.normalizedValue * maxSpeedKmpH / 3.6f; 
         
         private void Awake()
         {
-            motor = GetComponent<TrainMotor>();
+            motor = GetComponent<Carriage>();
         }
 
         private void FixedUpdate()

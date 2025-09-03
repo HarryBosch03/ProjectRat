@@ -1,31 +1,33 @@
+using System;
 using UnityEngine;
 using UnityEngine.Splines;
 
 namespace Runtime.Train
 {
     [RequireComponent(typeof(Rigidbody))]
-    public class TrainMotor : MonoBehaviour
+    public class Carriage : MonoBehaviour
     {
         public SplineContainer currentSpline;
         public Vector3 velocity;
-        
-        [Space]
+
         public Transform bogieFront;
         public Transform bogieBack;
         public Transform attachFront;
         public Transform attachBack;
-
-        [Space] public TrainMotor connectionFront;
-        [Space] public TrainMotor connectionBack;
+        
+        public Carriage connectionFront;
+        public Carriage connectionBack;
 
         private Rigidbody body;
+        private Vector3? oldPosition;
+        private Quaternion? oldRotation;
         
         public float forwardSpeed => Vector3.Dot(transform.forward, velocity);
 
         private void Awake()
         {
             body = GetComponent<Rigidbody>();
-
+            
             if (connectionFront == null)
             {
                 var current = this;
@@ -35,29 +37,54 @@ namespace Runtime.Train
                     current = current.connectionBack;
                 }
             }
+            
+            enabled = connectionFront == null;
         }
 
         private void FixedUpdate()
         {
-            var oldPosition = transform.position;
-            var oldRotation = transform.rotation;
-            
+            StartModifyPose();
             DoPhysicsStuff();
+            EndModifyPose();
 
+            if (connectionBack != null)
+            {
+                connectionBack.FixedUpdate();
+            }
+        }
+
+        public void EndModifyPose()
+        {
+            if (!oldPosition.HasValue || !oldRotation.HasValue) throw new Exception("StartModifyPose must be called before EndModifyPose");
+            
             var newPosition = transform.position;
             var newRotation = transform.rotation;
 
-            transform.position = oldPosition;
-            transform.rotation = oldRotation;
+            transform.position = oldPosition.Value;
+            transform.rotation = oldRotation.Value;
 
             body.MovePosition(newPosition);
             body.MoveRotation(newRotation);
         }
 
-        private void DoPhysicsStuff()
+        public void StartModifyPose()
+        {
+            oldPosition = transform.position;
+            oldRotation = transform.rotation;
+        }
+
+        public void DoPhysicsStuff()
         {
             transform.position += velocity * Time.deltaTime;
             velocity += Physics.gravity * Time.deltaTime;
+
+            if (connectionFront != null)
+            {
+                var otherAttach = connectionFront.attachBack;
+                var attach = attachFront;
+
+                transform.position += (otherAttach.position - attach.position);
+            }
             
             AlignToTracks();
         }
@@ -73,6 +100,17 @@ namespace Runtime.Train
             transform.position += (Vector3)nearest0 - bogieFront.position;
 
             velocity -= Vector3.ProjectOnPlane(velocity, transform.forward);
+        }
+
+        private void OnValidate()
+        {
+            if (!Application.isPlaying)
+            {
+                if (connectionBack != null && connectionBack.connectionFront != this)
+                {
+                    connectionBack.connectionFront = this;
+                }
+            }
         }
     }
 }
