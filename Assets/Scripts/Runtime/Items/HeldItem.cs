@@ -1,8 +1,5 @@
-using System;
-using System.Text;
 using Runtime.Interactables;
 using Runtime.Player;
-using TMPro;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -27,9 +24,14 @@ namespace Runtime.Items
         public bool EnablePhysics
         {
             get => !inWorldModel.isKinematic;
-            set => inWorldModel.isKinematic = !value;
+            set
+            {
+                inWorldModel.interpolation = value ? RigidbodyInterpolation.Interpolate : RigidbodyInterpolation.None;
+                inWorldModel.constraints = value ? RigidbodyConstraints.None : RigidbodyConstraints.FreezeAll;
+                inWorldModel.isKinematic = !value;
+            }
         }
-        
+
         private void Awake()
         {
             heldBehaviours = GetComponentsInChildren<IHeldItemBehaviour>(true);
@@ -63,19 +65,38 @@ namespace Runtime.Items
 
         public void Nudge(PlayerInteractionManager player, int direction) { }
 
-        public void Drop(PlayerInteractionManager player, Vector3 position, Vector3 velocity, bool enablePhysics)
+        public void Store(PlayerInteractionManager player, NetworkObject parent, Vector3 localPosition, Quaternion localRotation)
         {
             if (player != holder) return;
             SetHolderRpc(null);
-            DropRpc(position, velocity, enablePhysics);
+            StoreRpc(parent, localPosition, localRotation);
         }
 
         [Rpc(SendTo.Everyone)]
-        private void DropRpc(Vector3 position, Vector3 velocity, bool enablePhysics)
+        private void StoreRpc(NetworkObjectReference parentReference, Vector3 localPosition, Quaternion localRotation)
         {
+            parentReference.TryGet(out var parent);
+            
+            transform.SetParent(parent.transform);
+            transform.SetLocalPositionAndRotation(localPosition, localRotation);
+            EnablePhysics = false;
+        }
+
+        public void Drop(PlayerInteractionManager player, Vector3 position, Vector3 velocity)
+        {
+            if (player != holder) return;
+            SetHolderRpc(null);
+            DropRpc(position, velocity);
+        }
+
+        [Rpc(SendTo.Everyone)]
+        private void DropRpc(Vector3 position, Vector3 velocity)
+        {
+            EnablePhysics = true;
+            
             inWorldModel.transform.position = position;
             inWorldModel.linearVelocity = velocity;
-            EnablePhysics = enablePhysics;
+            
             Physics.SyncTransforms();
         }
 
@@ -96,9 +117,10 @@ namespace Runtime.Items
             playerRef.TryGet(out PlayerInteractionManager player);
 
             var previousHolder = holder;
-            holder = player;
-            if (player != null)
+            if (player != null && player.holding == null)
             {
+                holder = player;
+                
                 inWorldModel.gameObject.SetActive(false);
 
                 foreach (var heldBehaviour in heldBehaviours) heldBehaviour.enabled = true;
@@ -121,6 +143,8 @@ namespace Runtime.Items
             }
             else
             {
+                holder = null;
+                
                 inWorldModel.gameObject.SetActive(true);
                 firstPersonHeldModel.SetActive(false);
                 thirdPersonHeldModel.SetActive(false);

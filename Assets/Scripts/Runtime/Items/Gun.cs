@@ -1,3 +1,5 @@
+using System;
+using System.Collections;
 using System.Collections.Generic;
 using Runtime.Camera;
 using Runtime.Player;
@@ -5,6 +7,7 @@ using Runtime.Utility;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using Random = UnityEngine.Random;
 
 namespace Runtime.Items
 {
@@ -36,6 +39,7 @@ namespace Runtime.Items
         private float nextShootTime;
         private float reloadTimer;
         private Vector2 recoilVelocity;
+        private RaycastHit[] hitBuffer = new RaycastHit[128];
 
         public PlayerInteractionManager holder { get; private set; }
         public HeldItem heldItem { get; private set; }
@@ -147,9 +151,16 @@ namespace Runtime.Items
         private void ShootRpc(Vector3 position, Vector3 direction)
         {
             var ray = new Ray(position, direction);
-            if (Physics.Raycast(ray, out var hit))
+            var hitCount = Physics.RaycastNonAlloc(ray, hitBuffer);
+            Array.Sort(hitBuffer, 0, hitCount, new RaycastComparer());
+            
+            for (var i = 0; i < hitCount; i++)
             {
-                for (var i = 0; i < eventListeners.Count; i++) eventListeners[i].OnHit(hit);
+                var hit = hitBuffer[i];
+                if (hit.collider.transform.IsChildOf(holder.transform)) continue;
+                
+                for (var j = 0; j < eventListeners.Count; j++) eventListeners[j].OnHit(hit);
+                break;
             }
 
             var recoilStrength = this.recoilStrength + Random.Range(-recoilVariance, recoilVariance) * 0.5f;

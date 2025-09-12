@@ -15,10 +15,9 @@ namespace Runtime.Player
         public Vector3 dropPosition;
         public Vector3 dropVelocity;
 
-        private IInteractable lookingAt;
-
         public PlayerMotor motor { get; private set; }
         public HeldItem holding { get; private set; }
+        public IInteractable lookingAt { get; private set; }
 
         private void Awake()
         {
@@ -64,8 +63,7 @@ namespace Runtime.Player
         {
             if (!IsOwner) return;
             
-            holding.Drop(this, motor.head.TransformPoint(dropPosition),
-                motor.velocity + motor.head.TransformVector(dropVelocity), true);
+            holding.Drop(this, motor.head.TransformPoint(dropPosition), motor.totalVelocity + motor.head.TransformVector(dropVelocity));
         }
 
         private void FixedUpdate()
